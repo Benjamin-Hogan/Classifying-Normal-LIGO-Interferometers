@@ -27,7 +27,7 @@ BASE_DIR = os.getcwd()
 
 # Directory paths
 directories = {
-    "Q-transformed": os.path.join(BASE_DIR, 'data', 'Q-transformed_Files'),
+    "Pre-normalized": os.path.join(BASE_DIR, 'data', 'Pre-normalized_Files'),
     "normalized": os.path.join(BASE_DIR, 'data', 'Normalized_Files'),
     "train": os.path.join(BASE_DIR, 'data', 'data_set', 'train'),
     "val": os.path.join(BASE_DIR, 'data', 'data_set', 'val'),
@@ -40,8 +40,7 @@ directories = {
     "Anomalies": os.path.join(BASE_DIR, "data", "Anomalies")
 }
 
-
-# -------------- Helper Functions ------------------ # 
+#-------------- Helper Functions ------------- # 
 
 def create_directory_if_not_exists(directory):
     if not os.path.exists(directory):
@@ -49,6 +48,7 @@ def create_directory_if_not_exists(directory):
         print(f"Created directory: {directory}")
     else:
         print(f"Directory already exists: {directory}")
+
 
 def load_data(directory, batch_size=24):
     print(f"Listing files in {directory}...")
@@ -59,7 +59,7 @@ def load_data(directory, batch_size=24):
 
     def load_file(file_path):
         data = np.load(file_path.numpy())
-        data = np.expand_dims(data, axis=-1)  # Add a channel dimension
+        data = np.expand_dims(data, axis=-1)  # Add a channels dimension, reshaping to (262144, 1)
         return data, data
 
     dataset = dataset.map(lambda x: tf.py_function(load_file, [x], [tf.float32, tf.float32]), num_parallel_calls=tf.data.experimental.AUTOTUNE)
@@ -118,6 +118,7 @@ def select_random_file(directory):
     # Return the path of the selected file
     return selected_file_path
 
+
 class TqdmCallback(Callback):
     def on_epoch_begin(self, epoch, logs=None):
         self.epochs_bar = tqdm(total=self.params['steps'], position=0, leave=True)
@@ -134,29 +135,27 @@ class TqdmCallback(Callback):
         
 # ------------ Neural Network Functions ------------ # 
 
+from tensorflow.keras.layers import Conv1D, MaxPooling1D, UpSampling1D
+
 def create_autoencoder(input_shape):
-    input_img = Input(shape=input_shape)
-    x = Conv2D(16, (3, 3), activation='relu', padding='same')(input_img)
-    x = MaxPooling2D((2, 2), padding='same')(x)
-    x = Conv2D(8, (3, 3), activation='relu', padding='same')(x)
-    encoded = MaxPooling2D((2, 2), padding='same')(x)
+    input_img = Input(shape=input_shape)  # input_shape should be (steps, 1) for 1D arrays
+    x = Conv1D(16, 3, activation='relu', padding='same')(input_img)
+    x = MaxPooling1D(2, padding='same')(x)
+    x = Conv1D(8, 3, activation='relu', padding='same')(x)
+    encoded = MaxPooling1D(2, padding='same')(x)
     
-    x = Conv2D(8, (3, 3), activation='relu', padding='same')(encoded)
-    x = UpSampling2D((2, 2))(x)
-    x = Conv2D(16, (3, 3), activation='relu', padding='same')(x)
-    x = UpSampling2D((2, 2))(x)
+    x = Conv1D(8, 3, activation='relu', padding='same')(encoded)
+    x = UpSampling1D(2)(x)
+    x = Conv1D(16, 3, activation='relu', padding='same')(x)
+    x = UpSampling1D(2)(x)
     
-    cropping = ((0, 0), (0, 1))  # Adjust as needed
-    x = Cropping2D(cropping=cropping)(x)
-    
-    decoded = Conv2D(1, (3, 3), activation='sigmoid', padding='same')(x)
+    decoded = Conv1D(1, 3, activation='sigmoid', padding='same')(x)
 
     autoencoder = Model(input_img, decoded)
     autoencoder.compile(optimizer='adam', 
                         loss='mean_squared_error', 
                         metrics=[tf.keras.metrics.MeanSquaredError(), 
-                                tf.keras.metrics.MeanAbsoluteError()])
-
+                                 tf.keras.metrics.MeanAbsoluteError()])
 
     return autoencoder
 
@@ -215,7 +214,8 @@ class TensorBoardLoggingCallback(tf.keras.callbacks.Callback):
 def main():
     
     # ----- Ensuring Files Exist ----- # 
-    create_directory_if_not_exists(directories)
+    for dir_path in directories.values():
+        create_directory_if_not_exists(dir_path)
     
     # ------ Loading Data Sets ------ # 
     train_dataset, train_steps = load_data(directories['train'], batch_size=24)
@@ -243,7 +243,7 @@ def main():
         
     # ----- Auto Encoder Creation ----- # 
     # Define the input shape based on your data
-    input_shape = (1000, 2571, 1)  # Assuming grayscale images, hence the 1 in the end
+    input_shape = (262144, 1)  # Assuming grayscale images, hence the 1 in the end
 
     autoencoder = create_autoencoder(input_shape)
     autoencoder.summary()

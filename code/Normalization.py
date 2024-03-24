@@ -7,13 +7,12 @@ import concurrent.futures
 
 # ------------- Global Variables -------------- #
 BASE_DIR = os.getcwd()
-print(BASE_DIR)
 global_min = np.inf
 global_max = -np.inf
 
 # Directory paths
 directories = {
-    "Q-transformed": os.path.join(BASE_DIR, 'data', 'Q-transformed_Files'),
+    "Pre-normalized": os.path.join(BASE_DIR, 'data', 'Pre-normalized_Files'),
     "normalized": os.path.join(BASE_DIR, 'data', 'Normalized_Files'),
     "train": os.path.join(BASE_DIR, 'data', 'data_set', 'train'),
     "val": os.path.join(BASE_DIR, 'data', 'data_set', 'val'),
@@ -57,19 +56,20 @@ def process_file(filename):
     global global_min, global_max
     # Define file paths
     file_path = os.path.join(directories['data'], filename)
-    q_transformed_path = os.path.join(directories['Q-transformed'], filename)
 
     # Load and process the data
     data = np.load(file_path)
-    data_ts = TimeSeries(data, sample_rate=4096)
-    data_q_transformed = data_ts.q_transform()
-    data_log = data_q_transformed
+    #data_ts = TimeSeries(data, sample_rate=4096)
+    #data_q_transformed = data_ts.q_transform()
+    #data_log = data_q_transformed
 
     # Convert the Spectrogram object to a NumPy array
-    data_to_save = data_log.value if hasattr(data_log, 'value') else data_log
+    data_to_save = data.value if hasattr(data, 'value') else data
+    
+    q_transformed_file_path = os.path.join(directories['Pre-normalized'], 'Pre-normalized_'+filename)
 
     # Save the Q-transformed data
-    np.save(q_transformed_path, data_to_save)
+    np.save(q_transformed_file_path, data_to_save)
 
     # Update global min and max
     local_min = np.min(data_to_save)
@@ -86,7 +86,7 @@ def normalize_data(filename, data_directory, normalized_directory, global_min, g
     normalized_data = (data - global_min) / (global_max - global_min)
 
     # Save the normalized data to the new directory
-    normalized_file_path = os.path.join(normalized_directory, 'normalized_' + filename)
+    normalized_file_path = os.path.join(directories['normalized'], 'normalized_'+filename)
     np.save(normalized_file_path, normalized_data)
 
 def split_data(normalized_directory, train_directory, val_directory, test_directory, train_ratio=0.7, val_ratio=0.15):
@@ -136,18 +136,18 @@ def main():
                 print(f"Moved {filename} to {directories['nan_files']} due to NaN values.")
 
     # Define the number of threads
-    num_threads = 20
+    num_threads = 15
 
     # Loading & preprocessing data with threading
     npy_files = [f for f in os.listdir(directories['data']) if f.endswith('.npy')]
     
     # Count the number of files in each directory
     strain_data_files = [f for f in os.listdir(directories['data']) if f.endswith('.npy')]
-    q_transformed_files = [f for f in os.listdir(directories['Q-transformed']) if f.endswith('.npy')]
+    q_transformed_files = [f for f in os.listdir(directories['Pre-normalized']) if f.endswith('.npy')]
 
     if len(strain_data_files) == len(q_transformed_files):
         print("All files have already been processed. Updating global min and max.")
-        update_global_min_max(directories['Q-transformed'])
+        update_global_min_max(directories['Pre-normalized'])
         npy_files = q_transformed_files
     else:
         print("Processing new files.")
@@ -155,10 +155,10 @@ def main():
         with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as executor:
             list(tqdm(executor.map(process_file, npy_files), total=len(npy_files), desc="Processing Files"))
 
-
+    npy_files = [f for f in os.listdir(directories['Pre-normalized']) if f.endswith('.npy')]
     # Continue with normalization
     for filename in tqdm(npy_files, desc="Normalizing Files"):
-        normalize_data(filename, directories['Q-transformed'], directories['normalized'], global_min, global_max)
+        normalize_data(filename, directories['Pre-normalized'], directories['normalized'], global_min, global_max)
 
     print("Normalization process completed.")
     

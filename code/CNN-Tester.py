@@ -14,6 +14,8 @@ import matplotlib.pyplot as plt
 import matplotlib
 import matplotlib.gridspec as gridspec
 from tensorflow.keras.layers import Input, Conv2D, MaxPooling2D, UpSampling2D, Cropping2D
+from tensorflow.keras.layers import Conv1D, MaxPooling1D, UpSampling1D
+
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
 from tensorflow.keras.models import Model
 from tensorflow.keras.callbacks import Callback
@@ -29,7 +31,7 @@ BASE_DIR = os.getcwd()
 
 # Directory paths
 directories = {
-    "Q-transformed": os.path.join(BASE_DIR, 'data', 'Q-transformed_Files'),
+    "Pre-normalized": os.path.join(BASE_DIR, 'data', 'Pre-normalized_Files'),
     "normalized": os.path.join(BASE_DIR, 'data', 'Normalized_Files'),
     "train": os.path.join(BASE_DIR, 'data', 'data_set', 'train'),
     "val": os.path.join(BASE_DIR, 'data', 'data_set', 'val'),
@@ -39,9 +41,9 @@ directories = {
     "nan_files": os.path.join(BASE_DIR, "data", "NaN_Files"),
     "raw_data": os.path.join(BASE_DIR, "data", "Raw URL Data"),
     "spectrograms": os.path.join(BASE_DIR, "data", "Spectrograms"),
-    "Anomalies": os.path.join(BASE_DIR, "data", "Anomalies"),
-    "Reconstructions": os.path.join(BASE_DIR, "data", "Reconstructions")  # New directory for saving reconstructed images
+    "Anomalies": os.path.join(BASE_DIR, "data", "Anomalies")
 }
+
 
 # ------- Helper Functions -------- #
 
@@ -59,36 +61,47 @@ def load_data(directory, batch_size=24):
 
     dataset = dataset.map(lambda x: tf.py_function(load_file, [x], [tf.float32, tf.float32]), num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
-
-
     print(f"Batching and prefetching...")
     dataset = dataset.batch(batch_size).prefetch(tf.data.experimental.AUTOTUNE)
-        
     print("All data loaded and batched")
 
     return dataset
 
 def display_reconstructions(model, dataset, n=10):
-    # Take a single batch from the dataset
-    for test_images, _ in dataset.take(1):
+    # Shuffle the dataset and take 1 batch
+    for test_images, _ in dataset.shuffle(1000).take(1):
         decoded_images = model.predict(test_images)
-        
-        fig = plt.figure(figsize=(20, 8))  # Larger figure size
-        gs = gridspec.GridSpec(2, n, hspace=0.4, wspace=0.05)  # Define a grid spec
-        
+
+        # Set up the figure for plotting original and reconstructed data
+        fig, axes = plt.subplots(2, n, figsize=(20, 4))
+        time = np.linspace(0, 64, 262144)  # 64 seconds, 4096Hz
+
+        # Find the global min and max to set consistent y-axis limits
+        global_min = min(test_images.numpy().min(), decoded_images.min())
+        global_max = max(test_images.numpy().max(), decoded_images.max())
+
         for i in range(n):
-            # Original Image
-            ax = fig.add_subplot(gs[0, i])
-            ax.imshow(test_images[i].numpy().squeeze(), cmap='viridis', aspect='auto')
-            ax.set_title("Original", fontsize=10)
-            ax.axis('off')
+            # Ensure we do not go out of bounds if less than n examples are in the batch
+            if i >= test_images.shape[0]:
+                break
 
-            # Reconstructed Image
-            ax = fig.add_subplot(gs[1, i])
-            ax.imshow(decoded_images[i].squeeze(), cmap='viridis', aspect='auto')
-            ax.set_title("Reconstructed", fontsize=10)
-            ax.axis('off')
+            # Original Strain Data
+            ax = axes[0, i]
+            ax.plot(time, test_images[i].numpy().flatten(), color='black')
+            ax.set_title("Original")
+            ax.set_xlabel('Time (s)')
+            ax.set_ylabel('Strain')
+            ax.set_ylim(global_min, global_max)
 
+            # Reconstructed Strain Data
+            ax = axes[1, i]
+            ax.plot(time, decoded_images[i].flatten(), color='red')
+            ax.set_title("Reconstructed")
+            ax.set_xlabel('Time (s)')
+            ax.set_ylabel('Strain')
+            ax.set_ylim(global_min, global_max)
+
+        plt.tight_layout()
         plt.show()
 
 def create_directories(directory_paths):
@@ -116,31 +129,26 @@ def load_latest_checkpoint(model, checkpoint_dir):
         return 0
   
 def create_autoencoder(input_shape):
-    print('Begining Autoencoder Building')
-    input_img = Input(shape=input_shape)
-    x = Conv2D(16, (3, 3), activation='relu', padding='same')(input_img)
-    x = MaxPooling2D((2, 2), padding='same')(x)
-    x = Conv2D(8, (3, 3), activation='relu', padding='same')(x)
-    encoded = MaxPooling2D((2, 2), padding='same')(x)
+    input_img = Input(shape=input_shape)  # input_shape should be (steps, 1) for 1D arrays
+    x = Conv1D(16, 3, activation='relu', padding='same')(input_img)
+    x = MaxPooling1D(2, padding='same')(x)
+    x = Conv1D(8, 3, activation='relu', padding='same')(x)
+    encoded = MaxPooling1D(2, padding='same')(x)
     
-    x = Conv2D(8, (3, 3), activation='relu', padding='same')(encoded)
-    x = UpSampling2D((2, 2))(x)
-    x = Conv2D(16, (3, 3), activation='relu', padding='same')(x)
-    x = UpSampling2D((2, 2))(x)
+    x = Conv1D(8, 3, activation='relu', padding='same')(encoded)
+    x = UpSampling1D(2)(x)
+    x = Conv1D(16, 3, activation='relu', padding='same')(x)
+    x = UpSampling1D(2)(x)
     
-    cropping = ((0, 0), (0, 1))  # Adjust as needed
-    x = Cropping2D(cropping=cropping)(x)
-    
-    decoded = Conv2D(1, (3, 3), activation='sigmoid', padding='same')(x)
+    decoded = Conv1D(1, 3, activation='sigmoid', padding='same')(x)
 
     autoencoder = Model(input_img, decoded)
     autoencoder.compile(optimizer='adam', 
                         loss='mean_squared_error', 
                         metrics=[tf.keras.metrics.MeanSquaredError(), 
-                                tf.keras.metrics.MeanAbsoluteError()])
+                                 tf.keras.metrics.MeanAbsoluteError()])
 
-    print('Autoencoder Building Complete')
-    return autoencoder  
+    return autoencoder
 
 def evaluate_model(model, test_dataset):
     print("Evaluating model on test data...")
@@ -218,30 +226,22 @@ def main():
     # --- Ensure Folder Exist --- #
     create_directories(directories)
     
-    
     # ---- Load data ----- #
     test_data = load_data(directories["test"])
     train_data = load_data(directories["train"])
-    
-    # Print the shape of a single batch of test data
-    for images, _ in test_data.take(1):  # Take one batch from the dataset
-        print("Shape of test data batch:", images.shape)
 
     # --- Load Model ---- #
-    input_shape = (1000, 2571, 1)
+    input_shape = (262144, 1) 
     autoencoder = create_autoencoder(input_shape)
     ModelPlot(model=autoencoder, grid=False, connection=True, linewidth=0.1)
-    last_epoch = autoencoder.load_weights('/Users/benjaminhogan/Code/Senior Thesis PT2/data/Saved Models/best_model_03.h5')#load_latest_checkpoint(autoencoder, directories['models'])
+    last_epoch = autoencoder.load_weights('/Volumes/Research Thesis (BH 2023)/Classifying-Normal-LIGO-Instrument-/data/Saved Models/best_model_17.h5')#load_latest_checkpoint(autoencoder, directories['models'])  )
 
-    # --- Evaluate and Display Reconstructions ---- #
-    #evaluate_model(autoencoder, test_data)
-    #display_reconstructions(autoencoder, test_data, n=10)
+    # --- Evaluate Model ---- #
+    evaluate_model(autoencoder, test_data)
+    display_reconstructions(autoencoder, test_data, n=10)
     
     # --- Flag Anomalies --- #
-    anomalies, reconstruction_errors, anomaly_image_paths, reconstruction_image_paths = flag_anomalies(autoencoder, test_data)
-    
-    # --- Create Excel Report ---#
-    generate_excel_report(anomalies, anomaly_image_paths, reconstruction_image_paths)
+    anomalies, reconstruction_errors = flag_anomalies(autoencoder, test_data)
 
 if __name__ == "__main__":
     main()
