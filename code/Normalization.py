@@ -24,8 +24,12 @@ directories = {
     "data": os.path.join(BASE_DIR, "data", "Strain data"),
     "nan_files": os.path.join(BASE_DIR, "data", "NaN_Files"),
     "raw_data": os.path.join(BASE_DIR, "data", "Raw URL Data"),
-    "spectrograms": os.path.join(BASE_DIR, "data", "Spectrograms"),
-    "Anomalies": os.path.join(BASE_DIR, "data", "Anomalies")
+    "spectrograms": os.path.join(BASE_DIR, "data", "images", "Spectrograms"),
+    "Anomalies": os.path.join(BASE_DIR, "data", "images", "Anomalies"),
+    "Reconstructions": os.path.join(BASE_DIR, "data", "images", "Reconstructions"),
+    "images": os.path.join(BASE_DIR, "data", "images"),
+    "Comparison": os.path.join(BASE_DIR, "data", "images", "Comparisons"),
+    "Reports": os.path.join(BASE_DIR, "Reports")
 }
 
 #-------------- Helper Functions ------------- # 
