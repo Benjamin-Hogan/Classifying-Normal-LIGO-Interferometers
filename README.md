@@ -71,8 +71,8 @@ For support, email benhogan01@yahoo.com or open an issue on the GitHub repositor
 
 ## Authors and Acknowledgment
 Thank you to the contributors of this project.
-Dr. Andri M. Gretarsson (Research Professor ERAU) 
-Benjamin E. Hogan (Undergraduate Researcher ERAU)
+- Dr. Andri M. Gretarsson (Research Professor ERAU) 
+- Benjamin E. Hogan (Undergraduate Researcher ERAU)
 
 ## Project Status
 The project is in active development. Future updates will focus on improving the neural network model, expanding the data processing, and testing capabilities.
