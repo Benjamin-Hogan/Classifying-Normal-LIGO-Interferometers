@@ -47,7 +47,8 @@ BASE_DIR = notebook_path
 
 # Directory paths
 directories = {
-    "Q-transformed": os.path.join(BASE_DIR, 'data', 'Q-transformed_Files'),
+    #Creates a dictionary to store paths of various directories
+    "Pre-normalized": os.path.join(BASE_DIR, 'data', 'Pre-normalized_Files'),
     "normalized": os.path.join(BASE_DIR, 'data', 'Normalized_Files'),
     "train": os.path.join(BASE_DIR, 'data', 'data_set', 'train'),
     "val": os.path.join(BASE_DIR, 'data', 'data_set', 'val'),
@@ -56,11 +57,27 @@ directories = {
     "data": os.path.join(BASE_DIR, "data", "Strain data"),
     "nan_files": os.path.join(BASE_DIR, "data", "NaN_Files"),
     "raw_data": os.path.join(BASE_DIR, "data", "Raw URL Data"),
-    "spectrograms": os.path.join(BASE_DIR, "data", "Spectrograms"),
-    "Anomalies": os.path.join(BASE_DIR, "data", "Anomalies")
+    "spectrograms": os.path.join(BASE_DIR, "data", "images", "Spectrograms"),
+    "Anomalies": os.path.join(BASE_DIR, "data", "images", "Anomalies"),
+    "Reconstructions": os.path.join(BASE_DIR, "data", "images", "Reconstructions"),
+    "images": os.path.join(BASE_DIR, "data", "images"),
+    "Comparison": os.path.join(BASE_DIR, "data", "images", "Comparisons"),
+    "Reports": os.path.join(BASE_DIR, "Reports")
 }
 
-create_directory_if_not_exists(directories)
+def create_directory_if_not_exists(directory):
+    """
+    Checks if a directory exists in the file system; if not, it creates it.
+    
+    Parameters:
+    - directory (str): The path of the directory to check or create.
+    """
+    # Checks if directory exists, if not, create it
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+        print(f"Created directory: {directory}")
+    else:
+        print(f"Directory already exists: {directory}")
 
 def set_cancel_flag():
     cancel_event.set()
@@ -369,14 +386,6 @@ strain_path = ensure_folder_exists(directories['data'])
 # GUI Setup
 root = tk.Tk()
 root.title("Gravitational Wave Data Harvester")
-
-# Load your application logo
-logo_path = os.path.join(BASE_DIR, 'Harvester Logo.png')  # Replace 'your_logo.png' with your logo file name
-logo_image = Image.open(logo_path)
-logo_photo = ImageTk.PhotoImage(logo_image)
-
-# Set the application logo
-root.iconphoto(False, logo_photo)
 
 # Function to toggle fullscreen on/off
 def toggle_fullscreen(event=None):
