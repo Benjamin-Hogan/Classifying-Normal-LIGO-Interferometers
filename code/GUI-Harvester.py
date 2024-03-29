@@ -11,7 +11,6 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Thread, Lock, Event
 import tkinter as tk
 from tkinter import ttk, PhotoImage, messagebox, simpledialog, Text, filedialog
-
 import numpy as np
 import requests
 import matplotlib.pyplot as plt
@@ -445,7 +444,7 @@ status_label.grid(row=1, column=0, columnspan=3, padx=5, pady=5, sticky=tk.W)  #
 total_time_label = ttk.Label(frame_monitor, text="Total Elapsed Time: 0.00 seconds")
 total_time_label.grid(row=2, column=0, padx=5, pady=5, sticky=tk.W)
 
-average_time_label = ttk.Label(frame_monitor, text="Average Time for Each Spectrogram: 0.00 seconds")
+average_time_label = ttk.Label(frame_monitor, text="Average Time for Each File: 0.00 seconds")
 average_time_label.grid(row=2, column=1, padx=5, pady=5, sticky=tk.W)
 
 spectrogram_count_label = ttk.Label(frame_monitor, text="Number of Strain Files: 0")
