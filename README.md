@@ -12,9 +12,15 @@ Before you begin, ensure you have met the following requirements:
 ## Installation
 Follow these steps to install the necessary environment and dependencies for the project:
 
-1. **Python and Dependencies Installation:**
-   - Open a terminal and navigate to the project directory. It will look something like user@user_device/documents/Classifying-Normal-LIGO-interferometers/
-   - The hierarchy of where the terminal will be will be: .
+1. **Clone git Repository:**
+   - Open a terminal and navigate to the directory to put the repository on your local computer. It will look something like user@user_device/documents
+   - clone the repository using the following command:
+     ```bash
+     git clone https://github.com/Benjamin-Hogan/Classifying-Normal-LIGO-Interferometers.git
+     ```
+2. **Python and Dependencies Installation:**
+   - Open a terminal and navigate to the project directory. It will look something like user@user_device/documents/Classifying-Normal-LIGO-interferometers
+   - The hierarchy of where the terminal will be:
      ```bash
      ├── LICENSE
      ├── code
