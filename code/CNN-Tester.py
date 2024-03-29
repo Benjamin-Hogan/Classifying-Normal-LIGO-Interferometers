@@ -28,10 +28,9 @@ from neuralplot import ModelPlot
 from openpyxl import load_workbook
 from openpyxl.drawing.image import Image
 from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Image
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Image as ReportLabImage
 from reportlab.lib import colors
 from reportlab.lib.units import inch
-
 
 # -------- Global Vairables --------- #
 BASE_DIR = os.getcwd()
@@ -208,6 +207,36 @@ def insert_images_to_excel(excel_path, img_col='Plot Path'):
     # Save the workbook
     wb.save(excel_path)
 
+def extract_gps_time(file_path):
+    """
+    Extracts the GPS time from the file name.
+
+    Parameters:
+    - file_path (str): The path of the file.
+
+    Returns:
+    - str: The extracted GPS time as a string, or None if not found.
+    """
+    match = re.search(r"(\d{9,10})", file_path)
+    return match.group(1) if match else None
+
+def save_raw_predictions(reconstructed, gps_time, save_dir=directories["Reconstructions"]):
+    """
+    Saves the raw reconstructed predictions to a specified directory, named based on the GPS time.
+
+    Parameters:
+    - reconstructed (np.array): The reconstructed signal data.
+    - gps_time (str): The GPS time extracted from the file name.
+    - save_dir (str): The directory where the reconstructed predictions will be saved.
+    """
+    # Ensure the save directory exists
+    os.makedirs(save_dir, exist_ok=True)
+    
+    # Define the file path for saving the reconstructed signal
+    save_path = os.path.join(save_dir, f"reconstruction-{gps_time}.npy")
+    
+    # Save the numpy array to a file
+    np.save(save_path, reconstructed)
 
 # -------- Neural Network Functions -------- #
 
@@ -322,19 +351,38 @@ def evaluate_model(model, test_dataset):
     print(f"Test Loss: {test_loss}, Test MSE: {test_mse}, Test MAE: {test_mae}")
     return test_loss, test_mse, test_mae
 
+def predict_model(model, test_dataset):
+    """
+    Uses the inputed model to make predictions on the data being given
+    """
+    predictions = model.predict(test_dataset)
+    
+    for i in range(len(predictions)):
+        t=t
+    
 def flag_anomalies(model, dataset, n=10, threshold=0.001):
-    """Flag anomalies based on reconstruction error and save comparison plots."""
+    """Flag anomalies based on reconstruction error, save comparison plots, and save raw predictions."""
     anomaly_flags = []
     mse_scores = []
     plot_paths = []
+    gps_times = []  # List to store GPS times
     
     for idx, (test_images, _) in enumerate(dataset.take(n)):
+        file_paths = test_images.numpy()  # Assuming you have a way to access file paths from the dataset
         reconstructed_images = model.predict(test_images)
-        for i in range(len(test_images)):
+        
+        for i, file_path in enumerate(file_paths):
             original = test_images[i].numpy().flatten()
             reconstructed = reconstructed_images[i].flatten()
-            mse = np.round(np.mean((original - reconstructed) ** 2),4)
+            mse = np.mean((original - reconstructed) ** 2)
             mse_scores.append(mse)
+            
+            # Extract GPS time from file path
+            gps_time = extract_gps_time(str(file_path))
+            gps_times.append(gps_time)
+            
+            # Save raw reconstructed signal
+            save_raw_predictions(reconstructed[i], gps_time)
             
             # Save comparison plot
             plot_path = save_comparison_plot(original, reconstructed, idx * n + i)
@@ -348,6 +396,7 @@ def flag_anomalies(model, dataset, n=10, threshold=0.001):
     
     # Generate report data
     report_data = {
+        "GPS Time": gps_times,
         "MSE Score": mse_scores,
         "Is Anomaly": anomaly_flags,
         "Plot Path": plot_paths,
@@ -404,37 +453,39 @@ def generate_excel_report(anomaly_image_paths, reconstruction_image_paths):
 
 def generate_pdf_report(data_frame, pdf_path):
     """
-    Generate a PDF report with a table that includes embedded images.
+    Generate a PDF report with a table that includes GPS times, MSE scores, anomaly flags, 
+    and embedded images for comparison plots.
 
     Parameters:
-    - data_frame: DataFrame containing MSE scores, anomaly flags, and paths to the comparison plots.
+    - data_frame: DataFrame containing GPS times, MSE scores, anomaly flags, and paths to the comparison plots.
     - pdf_path: Path where the PDF report should be saved.
     """
     doc = SimpleDocTemplate(pdf_path, pagesize=letter)
     elements = []
 
     # Initialize table data with headers
-    table_data = [['MSE Score', 'Is Anomaly', 'Comparison Plot']]
+    table_data = [['GPS Time', 'MSE Score', 'Is Anomaly', 'Comparison Plot']]
 
     # Populate the table with data and images
     for index, row in data_frame.iterrows():
+        gps_time = row['GPS Time']
         mse_score = row['MSE Score']
         is_anomaly = row['Is Anomaly']
         plot_path = row['Plot Path']
 
         # Create an Image object for the plot if it exists
         if os.path.exists(plot_path):
-            img = Image(plot_path)
+            img = ReportLabImage(plot_path)
             img.drawHeight = 1*inch  # Adjust as needed
             img.drawWidth = 2*inch  # Adjust as needed
         else:
             img = "Image not found"
 
         # Append the row with image to the table data
-        table_data.append([mse_score, is_anomaly, img])
+        table_data.append([gps_time, "{:.2e}".format(mse_score), is_anomaly, img])
 
     # Create the table
-    table = Table(table_data, colWidths=[2*inch, 1*inch, 3*inch])
+    table = Table(table_data, colWidths=[1*inch, 1*inch, 1*inch, 3*inch])
     table.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.grey),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -467,7 +518,7 @@ def main():
     autoencoder = create_autoencoder(input_shape)
     #ModelPlot(model=autoencoder, grid=False, connection=True, linewidth=0.1)
     # It seems like you're trying to load weights directly after creating your model. Assuming this is intentional:
-    autoencoder.load_weights('/Users/benjaminhogan/Code/Projects/Classifying-Normal-LIGO-Instrument-/data/Saved Models/best_model_06.h5')
+    autoencoder.load_weights('/Users/benjaminhogan/Code/Projects/Classifying-Normal-LIGO-Instrument-/data/Saved Models/best_model_25.h5')
     
     # --- Evaluate Model ---- #
     #evaluate_model(autoencoder, test_data)
