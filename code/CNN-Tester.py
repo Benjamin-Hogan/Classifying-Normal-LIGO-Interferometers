@@ -24,7 +24,6 @@ import time
 import shutil
 import re
 import cv2
-from neuralplot import ModelPlot
 from openpyxl import load_workbook
 from openpyxl.drawing.image import Image
 from reportlab.lib.pagesizes import letter
