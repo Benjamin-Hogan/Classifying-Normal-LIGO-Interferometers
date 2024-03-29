@@ -19,7 +19,7 @@ from PIL import Image, ImageTk
 from scipy.io.wavfile import write as wav_write, read
 from gwosc.locate import get_urls
 from gwpy.timeseries import TimeSeries
-import sounddevice as sd
+
 
 # ----- Global Variables -----
 BASE_DIR = os.getcwd()
