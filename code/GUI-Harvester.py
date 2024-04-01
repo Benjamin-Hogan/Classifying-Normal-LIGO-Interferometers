@@ -27,6 +27,8 @@ cancel_operation = False
 operation_complete = False
 selected_detector = 'H1'  # Default
 num_workers_selected = 20  # Default
+start_gps_time = 946728000  # Default GPS start time
+end_gps_time = 1261871999   # Default GPS end time
 spectrogram_folder = None
 raw_data_folder = None
 options_dialog = None
@@ -97,8 +99,7 @@ def ensure_folder_exists(folder_name):
     return full_path
 
 def random_gps_time():
-    start_gps_time = 946728000
-    end_gps_time = 1261871999
+    global start_gps_time, end_gps_time
     return random.randint(start_gps_time, end_gps_time)
 
 def update_progress_bar():
@@ -186,8 +187,7 @@ def set_cancel_flag():
     global cancel_operation
     cancel_event.set()  # This line sets the cancel_event
     cancel_operation = True  # This line sets the cancel_operation global variable
-
-    
+   
 def update_status_label(completed_tasks, total_num_tasks):
     status_label.config(text=f"{completed_tasks}/{total_num_tasks} tasks completed.")
     root.update_idletasks()
@@ -220,7 +220,7 @@ def increment_completed_tasks():
         completed_tasks += 1
     
 def show_options_dialog():
-    global options_dialog, selected_detector, num_workers_selected
+    global options_dialog, selected_detector, num_workers_selected, start_gps_time, end_gps_time
     if options_dialog:
         options_dialog.destroy()
         options_dialog = None
@@ -243,10 +243,26 @@ def show_options_dialog():
     threads_entry.insert(0, str(num_workers_selected))
     threads_entry.pack()
 
+    gps_start_label = tk.Label(options_dialog, text="GPS Start Time:")
+    gps_start_label.pack()
+
+    gps_start_entry = tk.Entry(options_dialog)
+    gps_start_entry.insert(0, str(start_gps_time))
+    gps_start_entry.pack()
+
+    gps_end_label = tk.Label(options_dialog, text="GPS End Time:")
+    gps_end_label.pack()
+
+    gps_end_entry = tk.Entry(options_dialog)
+    gps_end_entry.insert(0, str(end_gps_time))
+    gps_end_entry.pack()
+
     def apply_and_close():
-        global selected_detector, num_workers_selected
+        global selected_detector, num_workers_selected, start_gps_time, end_gps_time
         selected_detector = detector_entry.get()
         num_workers_selected = int(threads_entry.get())
+        start_gps_time = int(gps_start_entry.get())
+        end_gps_time = int(gps_end_entry.get())
         options_dialog.destroy()
 
     apply_button = tk.Button(options_dialog, text="Apply", command=apply_and_close)
