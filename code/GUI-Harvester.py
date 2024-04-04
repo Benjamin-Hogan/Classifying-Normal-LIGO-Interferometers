@@ -19,7 +19,7 @@ from PIL import Image, ImageTk
 from scipy.io.wavfile import write as wav_write, read
 from gwosc.locate import get_urls
 from gwpy.timeseries import TimeSeries
-
+import webbrowser
 
 # ----- Global Variables -----
 BASE_DIR = os.getcwd()
@@ -272,11 +272,37 @@ def show_options_dialog():
 
 # Function to show a help dialog
 def show_help_dialog():
-    help_text = """This application allows you to download and analyze gravitational wave data to generate spectrograms.
+    help_text = f"""This application allows you to download and analyze gravitational wave data to generate spectrograms.
     - Enter the total number of tasks to specify how many spectrograms you want to generate.
     - Click 'Execute Script' to start the operation.
-    - Use 'Cancel Operation' to stop the ongoing process."""
-    messagebox.showinfo("Help", help_text)
+    - Use 'Cancel Operation' to stop the ongoing process.
+
+    You can find more information about the gravitational wave data used in this application at:
+    https://gwosc.org/data/
+
+    This website provides access to gravitational wave data from LIGO, Virgo, and KAGRA observatories. It includes documentation, tutorials, and tools for working with the data.
+    """
+    help_window = tk.Toplevel(root)
+    help_window.title("Help")
+
+    # Create a text widget to display the help text
+    help_text_widget = tk.Text(help_window, wrap=tk.WORD)
+    help_text_widget.insert(tk.END, help_text)
+    help_text_widget.config(state=tk.DISABLED)  # Disable editing of the text widget
+    help_text_widget.pack(padx=10, pady=10)
+
+    # Create a button to open the link in a web browser
+    def open_link(event=None):
+        import webbrowser
+        try:
+            webbrowser.open("https://gwosc.org/data/")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to open the link: {e}")
+        link_button.pack(pady=5)
+
+    # Bind the button and text widget to open the link when clicked
+    help_text_widget.bind("<Button-1>", open_link)
+    link_button.bind("<Button-1>", open_link)
 
 def update_progress_bar_and_percentage(completed_tasks, total_num_tasks):
     progress_bar["value"] = completed_tasks
