@@ -2,24 +2,17 @@
 import os
 import time
 import random
-import logging
 import platform
 import subprocess
 from time import perf_counter
-from glob import glob
 from concurrent.futures import ThreadPoolExecutor
 from threading import Thread, Lock, Event
 import tkinter as tk
-from tkinter import ttk, PhotoImage, messagebox, simpledialog, Text, filedialog
+from tkinter import ttk, messagebox
 import numpy as np
 import requests
-import matplotlib.pyplot as plt
-import pygame
-from PIL import Image, ImageTk
-from scipy.io.wavfile import write as wav_write, read
 from gwosc.locate import get_urls
 from gwpy.timeseries import TimeSeries
-
 
 # ----- Global Variables -----
 BASE_DIR = os.getcwd()
@@ -272,11 +265,59 @@ def show_options_dialog():
 
 # Function to show a help dialog
 def show_help_dialog():
-    help_text = """This application allows you to download and analyze gravitational wave data to generate spectrograms.
-    - Enter the total number of tasks to specify how many spectrograms you want to generate.
-    - Click 'Execute Script' to start the operation.
-    - Use 'Cancel Operation' to stop the ongoing process."""
-    messagebox.showinfo("Help", help_text)
+    help_text = f"""Welcome to the Gravitational Wave Data Harvester!
+
+This application allows you to download and analyze gravitational wave data from the LIGO, Virgo, and KAGRA observatories to generate spectrograms.
+
+Features:
+- Select the desired detector (e.g., H1, L1, V1, K1) and the number of threads to use.
+- Specify the GPS start and end times for the data range you want to analyze.
+- Enter the total number of tasks (spectrograms) you want to generate.
+- Click 'Execute Script' to start the operation.
+- Use 'Cancel Operation' to stop the ongoing process.
+- Monitor the progress, elapsed time, and average time for each spectrogram.
+- Access the generated files in the designated folders.
+
+For more information about the gravitational wave data and tools, visit:
+https://gwosc.org/data/
+
+This website provides access to documentation, tutorials, and tools for working with the data from the observatories.
+"""
+    help_window = tk.Toplevel(root)
+    help_window.title("Help")
+    help_window.geometry("800x600")
+    help_window.configure(bg="#333333")  # Set a dark gray background
+
+    # Create a frame to hold the text widget and scrollbar
+    frame = tk.Frame(help_window, bg="#333333")
+    frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+
+    # Create a text widget with a scrollbar
+    text_scroll = tk.Scrollbar(frame, bg="#333333", troughcolor="#222222")
+    text_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+    help_text_widget = tk.Text(frame, font=("Consolas", 12), wrap=tk.WORD, yscrollcommand=text_scroll.set, bg="#222222", fg="#FFFFFF")
+    help_text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+    text_scroll.config(command=help_text_widget.yview)
+
+    # Insert the help text into the text widget
+    help_text_widget.insert(tk.END, help_text)
+    help_text_widget.config(state=tk.DISABLED)
+
+    # Create a button to open the link in a web browser
+    def open_link(event=None):
+        import webbrowser
+        try:
+            webbrowser.open("https://gwosc.org/data/")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to open the link: {e}")
+
+    link_button = tk.Button(help_window, text="Visit gwosc.org/data", font=("Consolas", 12, "bold"), fg="#00FF00", bg="#333333", activebackground="#222222", activeforeground="#00FF00", command=open_link)
+    link_button.pack(pady=20)
+
+    # Bind the button and text widget to open the link when clicked
+    help_text_widget.bind("<Button-1>", open_link)
+    link_button.bind("<Button-1>", open_link)
+
 
 def update_progress_bar_and_percentage(completed_tasks, total_num_tasks):
     progress_bar["value"] = completed_tasks
@@ -473,11 +514,31 @@ raw_data_count_label.grid(row=3, column=1, padx=5, pady=5, sticky=tk.W)
 
 # Logs Frame
 frame_logs = ttk.LabelFrame(root, text="Logs", padding="10")
-frame_logs.grid(row=2, column=1, sticky='nsew', padx=10, pady=5)  # Changed pack to grid
+frame_logs.grid(row=2, column=1, sticky='nsew', padx=10, pady=5)
 
+# Create a scrollbar for the log panel
+log_scrollbar = tk.Scrollbar(frame_logs)
+log_scrollbar.grid(row=0, column=1, sticky='ns')
 
-log_panel = Text(frame_logs, height=10, width=50)
-log_panel.grid(sticky='nsew')  # Changed pack to grid
+log_panel = tk.Text(frame_logs, height=10, width=50, yscrollcommand=log_scrollbar.set)
+log_panel.grid(row=0, column=0, sticky='nsew')
+log_scrollbar.config(command=log_panel.yview)
+
+# Configure the grid to expand properly
+root.grid_rowconfigure(2, weight=1)
+root.grid_columnconfigure(1, weight=1)
+frame_logs.grid_rowconfigure(0, weight=1)
+frame_logs.grid_columnconfigure(0, weight=1)
+
+# Add a context menu to the log panel
+log_panel_menu = tk.Menu(root, tearoff=0)
+log_panel_menu.add_command(label="Copy", command=lambda: log_panel.event_generate("<<Copy>>"))
+log_panel_menu.add_command(label="Clear", command=lambda: log_panel.delete('1.0', tk.END))
+
+def show_log_panel_menu(event):
+    log_panel_menu.post(event.x_root, event.y_root)
+
+log_panel.bind("<Button-3>", show_log_panel_menu)
 
 # Configure the grid to expand properly
 root.grid_rowconfigure(2, weight=1)

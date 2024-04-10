@@ -475,7 +475,7 @@ def main():
         train_dataset,
         epochs=25,
         validation_data=val_dataset,
-        callbacks=[tensorboard_callback, tensorboard_logging_callback, early_stopping, checkpoint_callback],
+        callbacks=[tensorboard_callback, tensorboard_logging_callback, checkpoint_callback],
         steps_per_epoch=train_steps,
         validation_steps=val_steps,
         initial_epoch=last_epoch
