@@ -8,22 +8,13 @@
 import tensorflow as tf
 import numpy as np 
 import os
-import gwpy 
 from tqdm import tqdm
-from random import randint
 import matplotlib.pyplot as plt
-import matplotlib
-import matplotlib.gridspec as gridspec
-from tensorflow.keras.layers import Input, Conv2D, MaxPooling2D, UpSampling2D, Cropping2D
+from tensorflow.keras.layers import Input
 from tensorflow.keras.layers import Conv1D, MaxPooling1D, UpSampling1D
 import pandas as pd
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
 from tensorflow.keras.models import Model
-from tensorflow.keras.callbacks import Callback
-import time
-import shutil
 import re
-import cv2
 from openpyxl import load_workbook
 from openpyxl.drawing.image import Image
 from reportlab.lib.pagesizes import letter
@@ -124,7 +115,7 @@ def display_reconstructions(model, dataset, n=10):
         for i in range(n):
             if i >= test_images.shape[0]:  # Check to avoid out-of-bounds error
                 break
-
+            #Covert to LIGO
             # Plot original data
             ax = axes[0, i]
             ax.plot(time, test_images[i].numpy().flatten(), color='black')
@@ -262,10 +253,11 @@ def load_latest_checkpoint(model, checkpoint_dir):
         # Extract the epoch number from the checkpoint filename
         epoch_num_match = re.search(r"_(\d+).h5$", latest_checkpoint)
         last_epoch = int(epoch_num_match.group(1)) if epoch_num_match else 0
+        recent_epoch = last_epoch
         print(f'Loaded lasted model at epoch {last_epoch}')
         return last_epoch
     else:
-        print("No checkpoint found. Starting from scratch.")
+        print("No checkpoint found.")
         return 0
   
 def create_autoencoder(input_shape):
@@ -349,15 +341,6 @@ def evaluate_model(model, test_dataset):
     test_loss, test_mse, test_mae = model.evaluate(test_dataset)
     print(f"Test Loss: {test_loss}, Test MSE: {test_mse}, Test MAE: {test_mae}")
     return test_loss, test_mse, test_mae
-
-def predict_model(model, test_dataset):
-    """
-    Uses the inputed model to make predictions on the data being given
-    """
-    predictions = model.predict(test_dataset)
-    
-    for i in range(len(predictions)):
-        t=t
     
 def flag_anomalies(model, dataset, n=10, threshold=0.001):
     """Flag anomalies based on reconstruction error, save comparison plots, and save raw predictions."""
@@ -515,9 +498,10 @@ def main():
     # --- Load Model ---- #
     input_shape = (262144, 1)  # Assuming 1D signal with 262144 steps
     autoencoder = create_autoencoder(input_shape)
+    last_epoch = load_latest_checkpoint(autoencoder, directories['models'])
     #ModelPlot(model=autoencoder, grid=False, connection=True, linewidth=0.1)
     # It seems like you're trying to load weights directly after creating your model. Assuming this is intentional:
-    autoencoder.load_weights('/Users/benjaminhogan/Code/Projects/Classifying-Normal-LIGO-Instrument-/data/Saved Models/best_model_25.h5')
+    autoencoder.load_weights(f'data/Saved Models/best_model_{last_epoch}.h5')
     
     # --- Evaluate Model ---- #
     #evaluate_model(autoencoder, test_data)
@@ -527,7 +511,7 @@ def main():
     anomaly_report = flag_anomalies(autoencoder, test_data, n=10, threshold=0.001)
     
     # Optionally, save the report to an Excel file
-    report_path = os.path.join(directories["Reports"],  "anomaly_report.xlsx")
+    #report_path = os.path.join(directories["Reports"],  "anomaly_report.xlsx")
     #insert_images_to_excel(report_path, img_col='Plot Path')
     #print(f"Anomaly report saved to {report_path}")
     
