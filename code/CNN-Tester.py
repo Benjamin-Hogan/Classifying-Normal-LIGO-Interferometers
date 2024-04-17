@@ -49,37 +49,21 @@ directories = {
 # ------- Helper Functions -------- #
 
 def load_data(directory, batch_size=24):
-    """
-    Loads data from numpy files in the specified directory, adding a channel dimension and batching.
-
-    Parameters:
-    - directory (str): The path to the directory containing .npy files.
-    - batch_size (int, optional): The number of samples per batch. Default is 24.
-
-    Returns:
-    - tf.data.Dataset: A batched TensorFlow dataset with data loaded from the .npy files.
-    """
     print(f"Listing files in {directory}...")
-    # Get paths to .npy files within the directory
-    file_paths = [os.path.join(directory, f) for f in tqdm(os.listdir(directory), desc="Listing Files") if f.endswith('.npy')]
+    file_paths = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith('.npy')]
 
     print(f"Loading data from {directory}...")
-    # Create a TensorFlow dataset from the file paths
     dataset = tf.data.Dataset.from_tensor_slices(file_paths)
 
     def load_file(file_path):
-        """
-        Loads a numpy file, adds a channel dimension, and returns it.
-        
-        Parameters:
-        - file_path: The file path to load.
-
-        Returns:
-        - data, data: The loaded data with an added channel dimension, returned twice.
-        """
         data = np.load(file_path.numpy())
-        data = np.expand_dims(data, axis=-1)  # Add a channel dimension for TensorFlow compatibility
-        return data, data
+        data = np.expand_dims(data, axis=-1)
+        return data, file_path  # Return both data and path
+
+    dataset = dataset.map(lambda x: tf.py_function(load_file, [x], [tf.float32, tf.string]), num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    dataset = dataset.batch(batch_size).prefetch(tf.data.experimental.AUTOTUNE)
+    print("All data loaded and batched")
+    return dataset
 
     # Map the dataset through the load_file function, converting to TensorFlow objects
     dataset = dataset.map(lambda x: tf.py_function(load_file, [x], [tf.float32, tf.float32]), num_parallel_calls=tf.data.experimental.AUTOTUNE)
@@ -199,7 +183,7 @@ def insert_images_to_excel(excel_path, img_col='Plot Path'):
 
 def extract_gps_time(file_path):
     """
-    Extracts the GPS time from the file name.
+    Extracts the GPS time from the file name, assuming it follows the keyword 'around' and consists of digits.
 
     Parameters:
     - file_path (str): The path of the file.
@@ -207,8 +191,15 @@ def extract_gps_time(file_path):
     Returns:
     - str: The extracted GPS time as a string, or None if not found.
     """
-    match = re.search(r"(\d{9,10})", file_path)
-    return match.group(1) if match else None
+    # Regex pattern to find digits that follow the word 'around'
+    match = re.search(r"around\s+(\d+)", file_path)
+    if match:
+        gps_time = match.group(1)
+        print(f"GPS time extracted: {gps_time} from {file_path}")  # Debugging output
+        return gps_time
+    else:
+        print(f"No GPS time found in {file_path}")  # Debugging output
+        return None
 
 def save_raw_predictions(reconstructed, gps_time, save_dir=directories["Reconstructions"]):
     """
@@ -343,47 +334,36 @@ def evaluate_model(model, test_dataset):
     return test_loss, test_mse, test_mae
     
 def flag_anomalies(model, dataset, n=10, threshold=0.001):
-    """Flag anomalies based on reconstruction error, save comparison plots, and save raw predictions."""
     anomaly_flags = []
     mse_scores = []
     plot_paths = []
-    gps_times = []  # List to store GPS times
-    
-    for idx, (test_images, _) in enumerate(dataset.take(n)):
-        file_paths = test_images.numpy()  # Assuming you have a way to access file paths from the dataset
-        reconstructed_images = model.predict(test_images)
-        
-        for i, file_path in enumerate(file_paths):
-            original = test_images[i].numpy().flatten()
-            reconstructed = reconstructed_images[i].flatten()
-            mse = np.mean((original - reconstructed) ** 2)
-            mse_scores.append(mse)
+    gps_times = []
+
+    for data, paths in dataset.take(n):  # data and paths are batches
+        reconstructed = model.predict(data)
+        for i in range(data.shape[0]):
+            original = data[i].numpy().flatten()
+            recon = reconstructed[i].flatten()
+            mse = np.mean((original - recon) ** 2)
             
-            # Extract GPS time from file path
-            gps_time = extract_gps_time(str(file_path))
-            gps_times.append(gps_time)
-            
-            # Save raw reconstructed signal
-            save_raw_predictions(reconstructed[i], gps_time)
-            
-            # Save comparison plot
-            plot_path = save_comparison_plot(original, reconstructed, idx * n + i)
-            plot_paths.append(plot_path)
-            
-            # Flag as anomaly if MSE exceeds threshold
-            if mse > threshold:
-                anomaly_flags.append("yes")
+            file_path = paths[i].numpy().decode('utf-8')  # Decode the file path
+            gps_time = extract_gps_time(file_path)
+            if gps_time:
+                gps_times.append(gps_time)
+                plot_path = save_comparison_plot(original, recon, i)
+                plot_paths.append(plot_path)
+                anomaly_flag = "yes" if mse > threshold else "no"
+                anomaly_flags.append(anomaly_flag)
+                mse_scores.append(mse)
             else:
-                anomaly_flags.append("no")
-    
-    # Generate report data
-    report_data = {
+                print(f"Failed to extract GPS time from {file_path}")
+
+    return pd.DataFrame({
         "GPS Time": gps_times,
         "MSE Score": mse_scores,
         "Is Anomaly": anomaly_flags,
-        "Plot Path": plot_paths,
-    }
-    return pd.DataFrame(report_data)
+        "Plot Path": plot_paths
+    })
 
 def save_comparison_plot(original, reconstructed, idx, save_dir=directories["Comparison"]):
     """Save plots comparing original and reconstructed signals, and their difference."""
@@ -434,56 +414,40 @@ def generate_excel_report(anomaly_image_paths, reconstruction_image_paths):
     print(f"Excel report saved at {excel_path}")
 
 def generate_pdf_report(data_frame, pdf_path):
-    """
-    Generate a PDF report with a table that includes GPS times, MSE scores, anomaly flags, 
-    and embedded images for comparison plots.
-
-    Parameters:
-    - data_frame: DataFrame containing GPS times, MSE scores, anomaly flags, and paths to the comparison plots.
-    - pdf_path: Path where the PDF report should be saved.
-    """
     doc = SimpleDocTemplate(pdf_path, pagesize=letter)
     elements = []
 
-    # Initialize table data with headers
     table_data = [['GPS Time', 'MSE Score', 'Is Anomaly', 'Comparison Plot']]
 
-    # Populate the table with data and images
     for index, row in data_frame.iterrows():
         gps_time = row['GPS Time']
         mse_score = row['MSE Score']
         is_anomaly = row['Is Anomaly']
         plot_path = row['Plot Path']
 
-        # Create an Image object for the plot if it exists
         if os.path.exists(plot_path):
             img = ReportLabImage(plot_path)
-            img.drawHeight = 1*inch  # Adjust as needed
-            img.drawWidth = 2*inch  # Adjust as needed
+            img.drawHeight = 1 * inch
+            img.drawWidth = 2 * inch
         else:
             img = "Image not found"
 
-        # Append the row with image to the table data
-        table_data.append([gps_time, "{:.2e}".format(mse_score), is_anomaly, img])
+        table_data.append([gps_time, f"{mse_score:.2e}", is_anomaly, img])
 
-    # Create the table
     table = Table(table_data, colWidths=[1*inch, 1*inch, 1*inch, 3*inch])
     table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.grey),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('BOTTOMPADDING', (0,0), (-1,0), 12),
-        ('BACKGROUND', (0,1), (-1,-1), colors.beige),
-        ('GRID', (0,0), (-1,-1), 1, colors.black),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
     ]))
 
-    # Add the table to the elements list
     elements.append(table)
-
-    # Build the PDF
     doc.build(elements)
-    print(f"PDF report with images embedded within the table is generated at: {pdf_path}")
+    print(f"PDF report generated at: {pdf_path}")
 
 # -------- Define and run __MAIN__ ------ # 
 

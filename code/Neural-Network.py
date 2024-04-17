@@ -301,24 +301,27 @@ def create_autoencoder(input_shape):
     return autoencoder
 
 def launch_tensorboard(log_dir):
-    """
-    Launches TensorBoard in a subprocess and opens it in a web browser.
+    try:
+        # Launch TensorBoard as a subprocess with the provided log directory
+        tensorboard_process = subprocess.Popen(['tensorboard', f'--logdir=.'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-    Args:
-        log_dir (str): The directory where TensorBoard logs are stored.
+        # Wait a moment for TensorBoard to start or fail
+        time.sleep(5)
+        
+        if tensorboard_process.poll() is not None:
+            # If the process has terminated, there was an error
+            out, err = tensorboard_process.communicate()
+            print(f"TensorBoard failed to start. Output: {out.decode()}, Errors: {err.decode()}")
+        else:
+            # Open the TensorBoard URL in the web browser
+            tensorboard_url = 'http://localhost:6016'
+            print(f"TensorBoard is running at {tensorboard_url}")
+            webbrowser.open(tensorboard_url)
 
-    Returns:
-        subprocess.Popen: The subprocess in which TensorBoard is running.
-    """
-    # Launch TensorBoard as a subprocess
-    tensorboard_process = subprocess.Popen(['tensorboard', '--logdir', log_dir])
-
-    # Open the TensorBoard URL in the web browser
-    tensorboard_url = 'http://localhost:6006'
-    print(f"TensorBoard is running at {tensorboard_url}")
-    webbrowser.open(tensorboard_url)
-
-    return tensorboard_process
+        return tensorboard_process
+    except Exception as e:
+        print(f"Failed to launch TensorBoard: {e}")
+        return None
 
 def load_latest_checkpoint(model, checkpoint_dir):
     """
@@ -465,7 +468,7 @@ def main():
         monitor='val_loss',
         mode='min',
         save_freq='epoch')
-    
+
     ## ----- Auto Encoder Training ----- #
 
     # Then, in your main function, instantiate the TensorBoardLoggingCallback
@@ -473,7 +476,7 @@ def main():
 
     history = autoencoder.fit(
         train_dataset,
-        epochs=25,
+        epochs=250,
         validation_data=val_dataset,
         callbacks=[tensorboard_callback, tensorboard_logging_callback, checkpoint_callback],
         steps_per_epoch=train_steps,
