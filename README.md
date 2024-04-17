@@ -3,7 +3,7 @@
 ## Description
 This project analyzes and classifies the normal range for LIGO's gravitational wave detectors. 
 This is done using neural networks and more specifically an autoencoder. 
-It includes scripts for harvesting data straight from lIGO, normalizing the data, training the neural network, and testing the neural network. 
+It includes scripts for harvesting data straight from lIGO, normalizing the data, training the neural network, and testing it. 
 
 ## Prerequisites
 Before you begin, ensure you have met the following requirements:
@@ -22,18 +22,20 @@ Follow these steps to install the necessary environment and dependencies for the
    - Open a terminal and navigate to the project directory. It will look something like user@user_device/documents/Classifying-Normal-LIGO-interferometers
    - The hierarchy of where the terminal will be:
      ```bash
-     ├── LICENSE
-     ├── code
-     │   ├── CNN-Tester.py
-     │   ├── GUI-Harvester.py
-     │   ├── Neural-Network.py
-     │   └── Normalization.py
-     └── install_packages_mac.sh
-   - Run the script `install_packages_mac.sh` to install Python 3.11 and all required Python packages:
+      ├── LICENSE
+      ├── README.md
+      ├── code
+      │   ├── CNN-Tester.py
+      │   ├── GUI-Harvester.py
+      │   ├── Neural-Network.py
+      │   └── Normalization.py
+      ├── install_packages_mac_mamba.sh
+      └── install_packages_mac_standard.sh
+   - Run the script `install_packages_mac_standard.sh` or if you prefer using mamba use the same steps but use `install_packages_mamba.sh`. This will install Python 3.11 and all required Python packages:
      ```bash
      ./install_packages_mac.sh
-     ```
-   This script will install `numpy`, `scipy`, `matplotlib`, `requests`, `gwpy`, `tqdm`, `sounddevice`, `tensorflow`, `pandas`, `opencv-python-headless`, `Pillow`, `pygame`, `openpyxl`, `reportlab`, and the `tkinter` Python package using Homebrew and pip.
+     ```   
+This script will install `numpy`, `scipy`, `matplotlib`, `requests`, `gwpy`, `tqdm`, `sounddevice`, `tensorflow`, `pandas`, `opencv-python-headless`, `Pillow`, `pygame`, `openpyxl`, `reportlab`, and the `tkinter` Python package using Homebrew and pip.
 
 2. **Ensure All Scripts are Executable:**
    - For each `.py` script file (`CNN-Tester.py`, `GUI-Harvester.py`, `Neural-Network.py`, `Normalization.py`), change the permission to make sure they are executable:
